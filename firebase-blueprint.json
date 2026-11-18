@@ -1,0 +1,307 @@
+{
+  "entities": {
+    "BranchesConfig": {
+      "title": "BranchesConfig",
+      "description": "Configuración dinámica de sucursales activas de la boutique.",
+      "type": "object",
+      "properties": {
+        "items": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" }
+      },
+      "required": ["items", "updatedAt", "updatedByUid"]
+    },
+    "CategoriesConfig": {
+      "title": "CategoriesConfig",
+      "description": "Catálogo configurable de categorías de productos administrado por el administrador.",
+      "type": "object",
+      "properties": {
+        "items": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" }
+      },
+      "required": ["items", "updatedAt", "updatedByUid"]
+    },
+    "BrandingConfig": {
+      "title": "BrandingConfig",
+      "description": "Identidad visual configurable de la boutique (nombre comercial y logotipo).",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "companyLogoUrl": { "type": "string", "maxLength": 200000 },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" }
+      },
+      "required": ["companyName", "companyLogoUrl", "updatedAt", "updatedByUid"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Usuario interno del sistema con credenciales hashed (SHA-256), rol, sucursal asignada, permisos granulares y modo oscuro.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "nombreCompleto": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "usuario": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-zA-Z0-9._\\-]+$" },
+        "pinHash": { "type": "string", "minLength": 64, "maxLength": 64 },
+        "rol": { "type": "string", "enum": ["admin", "vendedor"] },
+        "sucursalAsignada": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "permisos": { "type": "object" },
+        "modoOscuro": { "type": "boolean" },
+        "activo": { "type": "boolean" },
+        "operatingScope": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastLoginAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nombreCompleto", "usuario", "pinHash", "rol", "sucursalAsignada", "permisos", "modoOscuro", "activo", "createdAt", "updatedAt", "lastLoginAt"]
+    },
+    "BranchCounter": {
+      "title": "BranchCounter",
+      "description": "Contador consecutivo por sucursal para generación atómica de folios de venta y apartados.",
+      "type": "object",
+      "properties": {
+        "branchId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "lastSequence": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["branchId", "lastSequence", "updatedAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Producto del catálogo de la boutique con existencias desglosadas por sucursal y soporte para variantes importadas.",
+      "type": "object",
+      "properties": {
+        "sku": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "barcodeSKU": { "type": "string", "maxLength": 64 },
+        "codigoModelo": { "type": "string", "maxLength": 64 },
+        "codigoActual": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "size": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "color": { "type": "string", "minLength": 1, "maxLength": 48 },
+        "marca": { "type": "string", "maxLength": 64 },
+        "especificaciones": { "type": "string", "maxLength": 240 },
+        "estatusOriginal": { "type": "string", "maxLength": 64 },
+        "costoReferencia": { "type": "number" },
+        "price": { "type": "number" },
+        "stock": { "type": "object" },
+        "createdByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sku", "name", "category", "size", "color", "price", "stock", "createdByUid", "createdAt", "updatedAt"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Comprobante de venta directa con folio consecutivo por sucursal (Efectivo, Tarjeta o Transferencia).",
+      "type": "object",
+      "properties": {
+        "folio": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "branchId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "branchName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "sellerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sellerName": { "type": "string", "maxLength": 120 },
+        "sellerUsuario": { "type": "string", "maxLength": 64 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discountType": { "type": "string", "enum": ["none", "fixed", "percent"] },
+        "discountValue": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["Efectivo", "Tarjeta", "Transferencia"] },
+        "cashReceived": { "type": "number" },
+        "changeGiven": { "type": "number" },
+        "cardReference": { "type": "string", "maxLength": 64 },
+        "transferReference": { "type": "string", "maxLength": 64 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 120 },
+        "status": { "type": "string", "enum": ["completada", "cancelada"] },
+        "cancelledAt": { "type": "string", "format": "date-time" },
+        "cancelledByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "cancelledByName": { "type": "string", "maxLength": 120 },
+        "cancellationReason": { "type": "string", "maxLength": 300 },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["folio", "branchId", "branchName", "sellerUid", "sellerName", "sellerUsuario", "items", "subtotal", "discountType", "discountValue", "discountAmount", "total", "paymentMethod", "cashReceived", "changeGiven", "cardReference", "createdAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Expediente CRM de cliente con datos de contacto, fecha de evento y datos fiscales opcionales.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "nombreCompleto": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "telefono": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "email": { "type": "string", "maxLength": 120 },
+        "fechaEvento": { "type": "string", "maxLength": 20 },
+        "notas": { "type": "string", "maxLength": 500 },
+        "datosFiscales": { "type": "object" },
+        "createdByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdByName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nombreCompleto", "telefono", "email", "fechaEvento", "notas", "datosFiscales", "createdByUid", "createdByName", "createdAt", "updatedAt"]
+    },
+    "Layaway": {
+      "title": "Layaway",
+      "description": "Apartado de mercancía sin intereses ni plazos forzosos con abonos libres y folio consecutivo por sucursal.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "folio": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "branchId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "branchName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "customerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "customerPhone": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "sellerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sellerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "sellerUsuario": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "totalPaid": { "type": "number" },
+        "remainingBalance": { "type": "number" },
+        "status": { "type": "string", "enum": ["activo", "liquidado", "entregado", "cancelado"] },
+        "notes": { "type": "string", "maxLength": 400 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "folio", "branchId", "branchName", "customerId", "customerName", "customerPhone", "sellerUid", "sellerName", "sellerUsuario", "items", "total", "totalPaid", "remainingBalance", "status", "notes", "createdAt", "updatedAt"]
+    },
+    "LayawayPayment": {
+      "title": "LayawayPayment",
+      "description": "Comprobante inmutable de abono o anticipo recibido para un apartado.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "receiptFolio": { "type": "string", "minLength": 1, "maxLength": 48 },
+        "layawayId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "layawayFolio": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "branchId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "branchName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "customerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "sellerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sellerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "sellerUsuario": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "amount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["Efectivo", "Tarjeta", "Transferencia"] },
+        "cashReceived": { "type": "number" },
+        "changeGiven": { "type": "number" },
+        "reference": { "type": "string", "maxLength": 64 },
+        "balanceBefore": { "type": "number" },
+        "balanceAfter": { "type": "number" },
+        "isInitialDeposit": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "receiptFolio", "layawayId", "layawayFolio", "branchId", "branchName", "customerId", "customerName", "sellerUid", "sellerName", "sellerUsuario", "amount", "paymentMethod", "cashReceived", "changeGiven", "reference", "balanceBefore", "balanceAfter", "isInitialDeposit", "createdAt"]
+    },
+    "CashRegisterShift": {
+      "title": "CashRegisterShift",
+      "description": "Turno y reporte histórico de apertura, arqueo y cierre de caja por sucursal.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "folio": { "type": "string", "minLength": 1, "maxLength": 48 },
+        "branchId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "branchName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "openingFund": { "type": "number" },
+        "openedByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "openedByName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "openedByUsuario": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "openedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "folio", "branchId", "branchName", "status", "openingFund", "openedByUid", "openedByName", "openedByUsuario", "openedAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Registro cronológico inmutable de auditoría de acciones críticas.",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "maxLength": 120 },
+        "userUsuario": { "type": "string", "maxLength": 64 },
+        "branchId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "branchName": { "type": "string", "maxLength": 80 },
+        "actionType": {
+          "type": "string",
+          "enum": [
+            "INICIO_SESION",
+            "CIERRE_SESION",
+            "CREACION_USUARIO",
+            "EDICION_USUARIO",
+            "CAMBIO_PERMISOS",
+            "ALTA_PRODUCTO",
+            "IMPORTACION_EXCEL",
+            "ENTRADA_STOCK",
+            "DESCARTE_STOCK",
+            "VACIADO_INVENTARIO",
+            "VENTA_REALIZADA",
+            "VENTA_CANCELADA",
+            "CONFIGURACION_SUCURSALES",
+            "CONFIGURACION_CATEGORIAS",
+            "CONFIGURACION_EMPRESA",
+            "CREACION_CLIENTE",
+            "EDICION_CLIENTE",
+            "APARTADO_CREADO",
+            "ABONO_APARTADO",
+            "APARTADO_LIQUIDADO",
+            "APARTADO_ENTREGADO",
+            "APARTADO_CANCELADO",
+            "APERTURA_CAJA",
+            "CIERRE_CAJA"
+          ]
+        },
+        "description": { "type": "string", "minLength": 1, "maxLength": 600 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userUid", "userName", "userUsuario", "branchId", "branchName", "actionType", "description", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/BranchesConfig" },
+      "description": "Configuración editable de sucursales ('branches'), categorías ('categories') e identidad ('branding')."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Perfiles de usuarios internos con usuario único, pinHash SHA-256, rol, permisos y modo oscuro."
+    },
+    "/counters/{branchId}": {
+      "schema": { "$ref": "#/entities/BranchCounter" },
+      "description": "Contadores consecutivos atómicos por sucursal para folios de venta y apartados."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Catálogo centralizado de productos con inventario desglosado por sucursal."
+    },
+    "/sales/{saleId}": {
+      "schema": { "$ref": "#/entities/Sale" },
+      "description": "Registro inmutable de ventas directas y tickets con folio consecutivo."
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Expedientes CRM de clientes con contacto, fecha de evento y datos fiscales opcionales."
+    },
+    "/layaways/{layawayId}": {
+      "schema": { "$ref": "#/entities/Layaway" },
+      "description": "Apartados de prendas por sucursal con saldo pendiente y estado."
+    },
+    "/layaway_payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/LayawayPayment" },
+      "description": "Historial inmutable de abonos y anticipos de apartados."
+    },
+    "/cash_registers/{registerId}": {
+      "schema": { "$ref": "#/entities/CashRegisterShift" },
+      "description": "Turnos abiertos y reportes históricos de cierre y arqueo de caja por sucursal."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Bitácora inmutable de auditoría de eventos críticos del sistema."
+    }
+  }
+}

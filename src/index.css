@@ -1,0 +1,205 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Thermal Ticket & Adhesive Roll Sticker Print Engine (@media print)
+   ========================================================================== */
+
+@page ticket58 {
+  size: 58mm auto;
+  margin: 2mm;
+}
+
+@page ticket80 {
+  size: 80mm auto;
+  margin: 3mm;
+}
+
+@page ticketA4 {
+  size: letter portrait;
+  margin: 12mm;
+}
+
+@page sticker50x25 {
+  size: 50mm 25mm;
+  margin: 0;
+}
+
+@page sticker50x30 {
+  size: 50mm 30mm;
+  margin: 0;
+}
+
+@page sticker40x20 {
+  size: 40mm 20mm;
+  margin: 0;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Thermal Ticket Printing */
+  .ticket-print-overlay {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  .ticket-print-shell {
+    border: none !important;
+    box-shadow: none !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .ticket-print-scroll {
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .ticket-print-area {
+    page: ticket80;
+    width: 74mm !important;
+    max-width: 74mm !important;
+    margin: 0 auto !important;
+    padding: 1.5mm 1mm !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: var(--font-mono) !important;
+    font-size: 10.5px !important;
+    line-height: 1.32 !important;
+  }
+
+  html[data-ticket-width="58mm"] .ticket-print-area {
+    page: ticket58;
+    width: 54mm !important;
+    max-width: 54mm !important;
+    padding: 1mm 0.5mm !important;
+    font-size: 9px !important;
+    line-height: 1.28 !important;
+  }
+
+  html[data-ticket-width="a4"] .ticket-print-area {
+    page: ticketA4;
+    width: 175mm !important;
+    max-width: 175mm !important;
+    padding: 6mm !important;
+    border: 1px solid #111111 !important;
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+  }
+
+  .ticket-print-area * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+  }
+
+  /* Adhesive Roll Sticker Printing */
+  .sticker-print-overlay {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  .sticker-print-sheet {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .sticker-print-item {
+    page: sticker50x25;
+    width: 50mm !important;
+    height: 25mm !important;
+    margin: 0 !important;
+    padding: 1mm 1.5mm !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  html[data-sticker-size="50x30"] .sticker-print-item {
+    page: sticker50x30;
+    width: 50mm !important;
+    height: 30mm !important;
+    padding: 1.4mm 1.8mm !important;
+  }
+
+  html[data-sticker-size="40x20"] .sticker-print-item {
+    page: sticker40x20;
+    width: 40mm !important;
+    height: 20mm !important;
+    padding: 0.8mm 1.2mm !important;
+  }
+
+  .sticker-print-item * {
+    color: #000000 !important;
+  }
+
+  .sticker-print-item:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+}

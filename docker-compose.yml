@@ -1,0 +1,113 @@
+# ==============================================================================
+# Atelier Boutique POS - Docker Compose (Frontend Nginx + Backend Node.js + DB MariaDB)
+# ==============================================================================
+# Uso rápido en servidor o entorno local:
+#   1. Copia .env.example a .env y define tus contraseñas (MARIADB_*, API_JWT_SECRET).
+#   2. Ejecuta: docker compose up -d --build
+#
+# Servicios:
+#   - frontend: React + Vite servido por Nginx en puerto ${APP_PORT:-80} (proxy /api -> backend)
+#   - backend:  API REST Node.js + Express + mysql2/promise en puerto ${API_PORT:-4000}
+#   - db:       MariaDB 10.11 LTS (InnoDB / utf8mb4_unicode_ci) con volumen persistente
+#               e inicialización automática de database/schema.sql
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Base de Datos MariaDB 10.11 LTS
+  # ----------------------------------------------------------------------------
+  db:
+    image: mariadb:10.11
+    container_name: boutique-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-storage-engine=InnoDB
+    environment:
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-atelier_boutique}
+      MARIADB_USER: ${MARIADB_USER:-boutique_app}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-cambia_esta_clave_app}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-cambia_esta_clave_root}
+      TZ: ${TZ:-America/Mexico_City}
+    ports:
+      - "${MARIADB_PORT:-3306}:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - boutique_network
+
+  # ----------------------------------------------------------------------------
+  # 2. Backend REST API (Node.js + Express + mysql2/promise)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: boutique-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${MARIADB_DATABASE:-atelier_boutique}
+      DB_USER: ${MARIADB_USER:-boutique_app}
+      DB_PASSWORD: ${MARIADB_PASSWORD:-cambia_esta_clave_app}
+      API_JWT_SECRET: ${API_JWT_SECRET:-cambia_este_secreto_jwt_en_produccion}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - boutique_network
+
+  # ----------------------------------------------------------------------------
+  # 3. Frontend SPA (Nginx + Proxy /api)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_DATA_SOURCE: ${VITE_DATA_SOURCE:-api}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
+        VITE_FIREBASE_DATABASE_ID: ${VITE_FIREBASE_DATABASE_ID:-}
+    container_name: boutique-frontend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - boutique_network
+
+volumes:
+  mariadb_data:
+    driver: local
+
+networks:
+  boutique_network:
+    driver: bridge

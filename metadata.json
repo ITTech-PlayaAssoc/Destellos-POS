@@ -1,0 +1,6 @@
+{
+  "name": "Atelier Aurelia — POS e Inventario Boutique",
+  "description": "Sistema empresarial de Punto de Venta, Inventario Multisucursal y Control de Acceso para boutique de vestidos de XV años y alta moda.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

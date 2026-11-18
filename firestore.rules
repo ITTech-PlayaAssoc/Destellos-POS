@@ -1,0 +1,519 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Hardened Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidBranchId(b) {
+      return isValidId(b);
+    }
+
+    function isValidCounterId(id) {
+      return isValidId(id);
+    }
+
+    function isValidPaymentMethod(m) {
+      return m in ['Efectivo', 'Tarjeta', 'Transferencia'];
+    }
+
+    function isValidPermissions(p) {
+      return p is map
+        && p.keys().hasAll(['viewInventory', 'addProduct', 'restockInventory', 'discardStock', 'performSales', 'viewOtherBranchesStock'])
+        && p.keys().hasOnly(['viewInventory', 'addProduct', 'restockInventory', 'discardStock', 'performSales', 'viewOtherBranchesStock', 'manageCustomers', 'manageLayaways', 'cancelLayaways'])
+        && p.viewInventory is bool
+        && p.addProduct is bool
+        && p.restockInventory is bool
+        && p.discardStock is bool
+        && p.performSales is bool
+        && p.viewOtherBranchesStock is bool
+        && (!('manageCustomers' in p.keys()) || p.manageCustomers is bool)
+        && (!('manageLayaways' in p.keys()) || p.manageLayaways is bool)
+        && (!('cancelLayaways' in p.keys()) || p.cancelLayaways is bool);
+    }
+
+    function isValidBranchInfo(b, expectedId) {
+      return b is map
+        && b.keys().hasAll(['id', 'name', 'city', 'address', 'phone'])
+        && b.keys().hasOnly(['id', 'name', 'city', 'address', 'phone'])
+        && b.id == expectedId
+        && b.name is string && b.name.size() >= 1 && b.name.size() <= 80
+        && b.city is string && b.city.size() <= 80
+        && b.address is string && b.address.size() <= 200
+        && b.phone is string && b.phone.size() <= 32;
+    }
+
+    function isValidBranchItem(b) {
+      return b is map
+        && b.keys().hasAll(['id', 'name', 'city', 'address', 'phone'])
+        && b.keys().hasOnly(['id', 'name', 'city', 'address', 'phone'])
+        && isValidId(b.id)
+        && b.name is string && b.name.size() >= 1 && b.name.size() <= 80
+        && b.city is string && b.city.size() <= 80
+        && b.address is string && b.address.size() <= 200
+        && b.phone is string && b.phone.size() <= 32;
+    }
+
+    function isValidStockMap(s) {
+      return s is map && s.keys().size() <= 50;
+    }
+
+    function isValidFiscalData(f) {
+      return f is map
+        && f.keys().hasAll(['rfc', 'razonSocial', 'codigoPostal', 'regimenFiscal', 'usoCfdi'])
+        && f.keys().hasOnly(['rfc', 'razonSocial', 'codigoPostal', 'regimenFiscal', 'usoCfdi'])
+        && f.rfc is string && f.rfc.size() <= 16
+        && f.razonSocial is string && f.razonSocial.size() <= 160
+        && f.codigoPostal is string && f.codigoPostal.size() <= 10
+        && f.regimenFiscal is string && f.regimenFiscal.size() <= 100
+        && f.usoCfdi is string && f.usoCfdi.size() <= 100;
+    }
+
+    function isValidLineItems(items) {
+      return items is list
+        && items.size() >= 1
+        && items.size() <= 50
+        && items[0] is map
+        && items[0].keys().hasAll(['productId', 'sku', 'name', 'size', 'color', 'unitPrice', 'quantity', 'lineTotal'])
+        && items[0].keys().hasOnly(['productId', 'sku', 'name', 'size', 'color', 'unitPrice', 'quantity', 'lineTotal'])
+        && items[0].productId is string && items[0].productId.size() >= 1 && items[0].productId.size() <= 128
+        && items[0].sku is string && items[0].sku.size() >= 1 && items[0].sku.size() <= 64
+        && items[0].name is string && items[0].name.size() >= 1 && items[0].name.size() <= 140
+        && items[0].size is string && items[0].size.size() <= 32
+        && items[0].color is string && items[0].color.size() <= 48
+        && (items[0].unitPrice is int || items[0].unitPrice is float) && items[0].unitPrice >= 0
+        && items[0].quantity is int && items[0].quantity >= 1
+        && (items[0].lineTotal is int || items[0].lineTotal is float) && items[0].lineTotal >= 0;
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidBranchesConfig(data) {
+      return (
+        (data.keys().hasAll(['items', 'updatedAt', 'updatedByUid'])
+          && data.keys().hasOnly(['items', 'updatedAt', 'updatedByUid'])
+          && data.items is list
+          && data.items.size() >= 1
+          && data.items.size() <= 30
+          && isValidBranchItem(data.items[0])
+          && data.updatedAt is timestamp
+          && isValidId(data.updatedByUid))
+        || (data.keys().hasAll(['branch_1', 'branch_2', 'branch_3', 'updatedAt', 'updatedByUid'])
+          && data.keys().hasOnly(['branch_1', 'branch_2', 'branch_3', 'updatedAt', 'updatedByUid'])
+          && isValidBranchInfo(data.branch_1, 'branch_1')
+          && isValidBranchInfo(data.branch_2, 'branch_2')
+          && isValidBranchInfo(data.branch_3, 'branch_3')
+          && data.updatedAt is timestamp
+          && isValidId(data.updatedByUid))
+      );
+    }
+
+    function isValidCategoriesConfig(data) {
+      return data.keys().hasAll(['items', 'updatedAt', 'updatedByUid'])
+        && data.keys().hasOnly(['items', 'updatedAt', 'updatedByUid'])
+        && data.items is list
+        && data.items.size() >= 1
+        && data.items.size() <= 50
+        && data.items[0] is string && data.items[0].size() >= 1 && data.items[0].size() <= 64
+        && data.updatedAt is timestamp
+        && isValidId(data.updatedByUid);
+    }
+
+    function isValidBrandingConfig(data) {
+      return data.keys().hasAll(['companyName', 'companyLogoUrl', 'updatedAt', 'updatedByUid'])
+        && data.keys().hasOnly(['companyName', 'companyLogoUrl', 'updatedAt', 'updatedByUid'])
+        && data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 80
+        && data.companyLogoUrl is string && data.companyLogoUrl.size() <= 200000
+        && data.updatedAt is timestamp
+        && isValidId(data.updatedByUid);
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['id', 'nombreCompleto', 'usuario', 'pinHash', 'rol', 'sucursalAsignada', 'permisos', 'modoOscuro', 'activo', 'createdAt', 'updatedAt', 'lastLoginAt'])
+        && data.keys().hasOnly(['id', 'nombreCompleto', 'usuario', 'pinHash', 'rol', 'sucursalAsignada', 'permisos', 'modoOscuro', 'activo', 'operatingScope', 'createdAt', 'updatedAt', 'lastLoginAt'])
+        && isValidId(data.id)
+        && data.nombreCompleto is string && data.nombreCompleto.size() >= 1 && data.nombreCompleto.size() <= 120
+        && data.usuario is string && data.usuario.size() >= 1 && data.usuario.size() <= 64 && data.usuario.matches('^[a-zA-Z0-9._\\-]+$')
+        && data.pinHash is string && data.pinHash.size() == 64 && data.pinHash.matches('^[a-f0-9]{64}$')
+        && data.rol in ['admin', 'vendedor']
+        && isValidBranchId(data.sucursalAsignada)
+        && isValidPermissions(data.permisos)
+        && data.modoOscuro is bool
+        && data.activo is bool
+        && (!('operatingScope' in data.keys()) || isValidId(data.operatingScope))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.lastLoginAt is timestamp;
+    }
+
+    function isValidCounter(data, counterId) {
+      return data.keys().hasAll(['branchId', 'lastSequence', 'updatedAt'])
+        && data.keys().hasOnly(['branchId', 'lastSequence', 'updatedAt'])
+        && isValidCounterId(counterId)
+        && data.branchId == counterId
+        && data.lastSequence is int && data.lastSequence >= 1 && data.lastSequence <= 100000000
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['sku', 'name', 'category', 'size', 'color', 'price', 'stock', 'createdByUid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['sku', 'barcodeSKU', 'codigoModelo', 'codigoActual', 'name', 'category', 'size', 'color', 'marca', 'especificaciones', 'estatusOriginal', 'costoReferencia', 'price', 'stock', 'createdByUid', 'createdAt', 'updatedAt'])
+        && data.sku is string && data.sku.size() >= 1 && data.sku.size() <= 64
+        && (!('barcodeSKU' in data.keys()) || (data.barcodeSKU is string && data.barcodeSKU.size() <= 64))
+        && (!('codigoModelo' in data.keys()) || (data.codigoModelo is string && data.codigoModelo.size() <= 64))
+        && (!('codigoActual' in data.keys()) || (data.codigoActual is string && data.codigoActual.size() <= 64))
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 140
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 64
+        && data.size is string && data.size.size() >= 1 && data.size.size() <= 32
+        && data.color is string && data.color.size() >= 1 && data.color.size() <= 48
+        && (!('marca' in data.keys()) || (data.marca is string && data.marca.size() <= 64))
+        && (!('especificaciones' in data.keys()) || (data.especificaciones is string && data.especificaciones.size() <= 240))
+        && (!('estatusOriginal' in data.keys()) || (data.estatusOriginal is string && data.estatusOriginal.size() <= 64))
+        && (!('costoReferencia' in data.keys()) || ((data.costoReferencia is int || data.costoReferencia is float) && data.costoReferencia >= 0 && data.costoReferencia <= 10000000))
+        && (data.price is int || data.price is float) && data.price >= 0 && data.price <= 10000000
+        && isValidStockMap(data.stock)
+        && isValidId(data.createdByUid)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSale(data) {
+      return data.keys().hasAll(['folio', 'branchId', 'branchName', 'sellerUid', 'sellerName', 'sellerUsuario', 'items', 'subtotal', 'discountType', 'discountValue', 'discountAmount', 'total', 'paymentMethod', 'cashReceived', 'changeGiven', 'cardReference', 'createdAt'])
+        && data.keys().hasOnly(['folio', 'branchId', 'branchName', 'sellerUid', 'sellerName', 'sellerUsuario', 'items', 'subtotal', 'discountType', 'discountValue', 'discountAmount', 'total', 'paymentMethod', 'cashReceived', 'changeGiven', 'cardReference', 'transferReference', 'customerId', 'customerName', 'status', 'cancelledAt', 'cancelledByUid', 'cancelledByName', 'cancellationReason', 'updatedAt', 'createdAt'])
+        && data.folio is string && data.folio.size() >= 1 && data.folio.size() <= 40
+        && isValidBranchId(data.branchId)
+        && data.branchName is string && data.branchName.size() >= 1 && data.branchName.size() <= 80
+        && isValidId(data.sellerUid)
+        && data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120
+        && data.sellerUsuario is string && data.sellerUsuario.size() >= 1 && data.sellerUsuario.size() <= 64
+        && isValidLineItems(data.items)
+        && (data.subtotal is int || data.subtotal is float) && data.subtotal >= 0
+        && data.discountType in ['none', 'fixed', 'percent']
+        && (data.discountValue is int || data.discountValue is float) && data.discountValue >= 0
+        && (data.discountAmount is int || data.discountAmount is float) && data.discountAmount >= 0
+        && (data.total is int || data.total is float) && data.total >= 0
+        && isValidPaymentMethod(data.paymentMethod)
+        && (data.cashReceived is int || data.cashReceived is float) && data.cashReceived >= 0
+        && (data.changeGiven is int || data.changeGiven is float) && data.changeGiven >= 0
+        && data.cardReference is string && data.cardReference.size() <= 64
+        && (!('transferReference' in data.keys()) || (data.transferReference is string && data.transferReference.size() <= 64))
+        && (!('customerId' in data.keys()) || (data.customerId is string && data.customerId.size() <= 128))
+        && (!('customerName' in data.keys()) || (data.customerName is string && data.customerName.size() <= 120))
+        && (!('status' in data.keys()) || data.status in ['completada', 'cancelada'])
+        && (!('cancelledAt' in data.keys()) || data.cancelledAt is timestamp)
+        && (!('cancelledByUid' in data.keys()) || isValidId(data.cancelledByUid))
+        && (!('cancelledByName' in data.keys()) || (data.cancelledByName is string && data.cancelledByName.size() <= 120))
+        && (!('cancellationReason' in data.keys()) || (data.cancellationReason is string && data.cancellationReason.size() <= 300))
+        && (!('updatedAt' in data.keys()) || data.updatedAt is timestamp)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['id', 'nombreCompleto', 'telefono', 'email', 'fechaEvento', 'notas', 'datosFiscales', 'createdByUid', 'createdByName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'nombreCompleto', 'telefono', 'email', 'fechaEvento', 'notas', 'datosFiscales', 'createdByUid', 'createdByName', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.nombreCompleto is string && data.nombreCompleto.size() >= 1 && data.nombreCompleto.size() <= 120
+        && data.telefono is string && data.telefono.size() >= 1 && data.telefono.size() <= 32
+        && data.email is string && data.email.size() <= 120
+        && data.fechaEvento is string && data.fechaEvento.size() <= 20
+        && data.notas is string && data.notas.size() <= 500
+        && isValidFiscalData(data.datosFiscales)
+        && isValidId(data.createdByUid)
+        && data.createdByName is string && data.createdByName.size() >= 1 && data.createdByName.size() <= 120
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLayaway(data) {
+      return data.keys().hasAll(['id', 'folio', 'branchId', 'branchName', 'customerId', 'customerName', 'customerPhone', 'sellerUid', 'sellerName', 'sellerUsuario', 'items', 'total', 'totalPaid', 'remainingBalance', 'status', 'notes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'folio', 'branchId', 'branchName', 'customerId', 'customerName', 'customerPhone', 'sellerUid', 'sellerName', 'sellerUsuario', 'items', 'total', 'totalPaid', 'remainingBalance', 'status', 'notes', 'createdAt', 'updatedAt', 'settledAt', 'deliveredAt', 'deliveredByUid', 'deliveredByName', 'cancelledAt', 'cancelledByUid', 'cancelledByName', 'cancellationReason'])
+        && isValidId(data.id)
+        && data.folio is string && data.folio.size() >= 1 && data.folio.size() <= 40
+        && isValidBranchId(data.branchId)
+        && data.branchName is string && data.branchName.size() >= 1 && data.branchName.size() <= 80
+        && isValidId(data.customerId)
+        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120
+        && data.customerPhone is string && data.customerPhone.size() >= 1 && data.customerPhone.size() <= 32
+        && isValidId(data.sellerUid)
+        && data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120
+        && data.sellerUsuario is string && data.sellerUsuario.size() >= 1 && data.sellerUsuario.size() <= 64
+        && isValidLineItems(data.items)
+        && (data.total is int || data.total is float) && data.total >= 0
+        && (data.totalPaid is int || data.totalPaid is float) && data.totalPaid >= 0 && data.totalPaid <= data.total
+        && (data.remainingBalance is int || data.remainingBalance is float) && data.remainingBalance >= 0 && data.remainingBalance <= data.total
+        && data.status in ['activo', 'liquidado', 'entregado', 'cancelado']
+        && data.notes is string && data.notes.size() <= 400
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('settledAt' in data.keys()) || data.settledAt is timestamp)
+        && (!('deliveredAt' in data.keys()) || data.deliveredAt is timestamp)
+        && (!('deliveredByUid' in data.keys()) || isValidId(data.deliveredByUid))
+        && (!('deliveredByName' in data.keys()) || (data.deliveredByName is string && data.deliveredByName.size() <= 120))
+        && (!('cancelledAt' in data.keys()) || data.cancelledAt is timestamp)
+        && (!('cancelledByUid' in data.keys()) || isValidId(data.cancelledByUid))
+        && (!('cancelledByName' in data.keys()) || (data.cancelledByName is string && data.cancelledByName.size() <= 120))
+        && (!('cancellationReason' in data.keys()) || (data.cancellationReason is string && data.cancellationReason.size() <= 300));
+    }
+
+    function isValidLayawayPayment(data) {
+      return data.keys().hasAll(['id', 'receiptFolio', 'layawayId', 'layawayFolio', 'branchId', 'branchName', 'customerId', 'customerName', 'sellerUid', 'sellerName', 'sellerUsuario', 'amount', 'paymentMethod', 'cashReceived', 'changeGiven', 'reference', 'balanceBefore', 'balanceAfter', 'isInitialDeposit', 'createdAt'])
+        && data.keys().hasOnly(['id', 'receiptFolio', 'layawayId', 'layawayFolio', 'branchId', 'branchName', 'customerId', 'customerName', 'sellerUid', 'sellerName', 'sellerUsuario', 'amount', 'paymentMethod', 'cashReceived', 'changeGiven', 'reference', 'balanceBefore', 'balanceAfter', 'isInitialDeposit', 'createdAt'])
+        && isValidId(data.id)
+        && data.receiptFolio is string && data.receiptFolio.size() >= 1 && data.receiptFolio.size() <= 48
+        && isValidId(data.layawayId)
+        && data.layawayFolio is string && data.layawayFolio.size() >= 1 && data.layawayFolio.size() <= 40
+        && isValidBranchId(data.branchId)
+        && data.branchName is string && data.branchName.size() >= 1 && data.branchName.size() <= 80
+        && isValidId(data.customerId)
+        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120
+        && isValidId(data.sellerUid)
+        && data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120
+        && data.sellerUsuario is string && data.sellerUsuario.size() >= 1 && data.sellerUsuario.size() <= 64
+        && (data.amount is int || data.amount is float) && data.amount > 0
+        && isValidPaymentMethod(data.paymentMethod)
+        && (data.cashReceived is int || data.cashReceived is float) && data.cashReceived >= 0
+        && (data.changeGiven is int || data.changeGiven is float) && data.changeGiven >= 0
+        && data.reference is string && data.reference.size() <= 64
+        && (data.balanceBefore is int || data.balanceBefore is float) && data.balanceBefore >= 0
+        && (data.balanceAfter is int || data.balanceAfter is float) && data.balanceAfter >= 0
+        && data.isInitialDeposit is bool
+        && data.createdAt is timestamp;
+    }
+
+    function isValidCashRegister(data) {
+      return data.keys().hasAll(['id', 'folio', 'branchId', 'branchName', 'status', 'openingFund', 'openedByUid', 'openedByName', 'openedByUsuario', 'openedAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'folio', 'branchId', 'branchName', 'status', 'openingFund', 'openedByUid', 'openedByName', 'openedByUsuario', 'openedAt', 'updatedAt', 'closedByUid', 'closedByName', 'closedByUsuario', 'closedAt', 'directSalesCount', 'directSalesCash', 'directSalesCard', 'directSalesTransfer', 'directSalesTotal', 'layawayPaymentsCount', 'layawayCash', 'layawayCard', 'layawayTransfer', 'layawayTotal', 'expectedCashTotal', 'totalCard', 'totalTransfer', 'grandTotalIncome', 'countedCash', 'difference', 'observations'])
+        && isValidId(data.id)
+        && data.folio is string && data.folio.size() >= 1 && data.folio.size() <= 48
+        && isValidBranchId(data.branchId)
+        && data.branchName is string && data.branchName.size() >= 1 && data.branchName.size() <= 80
+        && data.status in ['open', 'closed']
+        && (data.openingFund is int || data.openingFund is float) && data.openingFund >= 0
+        && isValidId(data.openedByUid)
+        && data.openedByName is string && data.openedByName.size() >= 1 && data.openedByName.size() <= 120
+        && data.openedByUsuario is string && data.openedByUsuario.size() >= 1 && data.openedByUsuario.size() <= 64
+        && data.openedAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('closedByUid' in data.keys()) || isValidId(data.closedByUid))
+        && (!('closedByName' in data.keys()) || (data.closedByName is string && data.closedByName.size() <= 120))
+        && (!('closedByUsuario' in data.keys()) || (data.closedByUsuario is string && data.closedByUsuario.size() <= 64))
+        && (!('closedAt' in data.keys()) || data.closedAt is timestamp)
+        && (!('directSalesCount' in data.keys()) || (data.directSalesCount is int && data.directSalesCount >= 0))
+        && (!('directSalesCash' in data.keys()) || ((data.directSalesCash is int || data.directSalesCash is float) && data.directSalesCash >= 0))
+        && (!('directSalesCard' in data.keys()) || ((data.directSalesCard is int || data.directSalesCard is float) && data.directSalesCard >= 0))
+        && (!('directSalesTransfer' in data.keys()) || ((data.directSalesTransfer is int || data.directSalesTransfer is float) && data.directSalesTransfer >= 0))
+        && (!('directSalesTotal' in data.keys()) || ((data.directSalesTotal is int || data.directSalesTotal is float) && data.directSalesTotal >= 0))
+        && (!('layawayPaymentsCount' in data.keys()) || (data.layawayPaymentsCount is int && data.layawayPaymentsCount >= 0))
+        && (!('layawayCash' in data.keys()) || ((data.layawayCash is int || data.layawayCash is float) && data.layawayCash >= 0))
+        && (!('layawayCard' in data.keys()) || ((data.layawayCard is int || data.layawayCard is float) && data.layawayCard >= 0))
+        && (!('layawayTransfer' in data.keys()) || ((data.layawayTransfer is int || data.layawayTransfer is float) && data.layawayTransfer >= 0))
+        && (!('layawayTotal' in data.keys()) || ((data.layawayTotal is int || data.layawayTotal is float) && data.layawayTotal >= 0))
+        && (!('expectedCashTotal' in data.keys()) || ((data.expectedCashTotal is int || data.expectedCashTotal is float) && data.expectedCashTotal >= 0))
+        && (!('totalCard' in data.keys()) || ((data.totalCard is int || data.totalCard is float) && data.totalCard >= 0))
+        && (!('totalTransfer' in data.keys()) || ((data.totalTransfer is int || data.totalTransfer is float) && data.totalTransfer >= 0))
+        && (!('grandTotalIncome' in data.keys()) || ((data.grandTotalIncome is int || data.grandTotalIncome is float) && data.grandTotalIncome >= 0))
+        && (!('countedCash' in data.keys()) || ((data.countedCash is int || data.countedCash is float) && data.countedCash >= 0))
+        && (!('difference' in data.keys()) || (data.difference is int || data.difference is float))
+        && (!('observations' in data.keys()) || (data.observations is string && data.observations.size() <= 500));
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['userUid', 'userName', 'userUsuario', 'branchId', 'branchName', 'actionType', 'description', 'createdAt'])
+        && data.keys().hasOnly(['userUid', 'userName', 'userUsuario', 'branchId', 'branchName', 'actionType', 'description', 'createdAt'])
+        && isValidId(data.userUid)
+        && data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 120
+        && data.userUsuario is string && data.userUsuario.size() >= 1 && data.userUsuario.size() <= 64
+        && isValidId(data.branchId)
+        && data.branchName is string && data.branchName.size() >= 1 && data.branchName.size() <= 80
+        && data.actionType in ['INICIO_SESION', 'CIERRE_SESION', 'CREACION_USUARIO', 'EDICION_USUARIO', 'CAMBIO_PERMISOS', 'ALTA_PRODUCTO', 'IMPORTACION_EXCEL', 'ENTRADA_STOCK', 'DESCARTE_STOCK', 'VACIADO_INVENTARIO', 'VENTA_REALIZADA', 'VENTA_CANCELADA', 'CONFIGURACION_SUCURSALES', 'CONFIGURACION_CATEGORIAS', 'CONFIGURACION_EMPRESA', 'CREACION_CLIENTE', 'EDICION_CLIENTE', 'APARTADO_CREADO', 'ABONO_APARTADO', 'APARTADO_LIQUIDADO', 'APARTADO_ENTREGADO', 'APARTADO_CANCELADO', 'APERTURA_CAJA', 'CIERRE_CAJA']
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 600
+        && data.createdAt is timestamp;
+    }
+
+    // 4. Collection Rules
+    match /settings/{settingId} {
+      allow get: if settingId in ['branches', 'branding', 'categories'];
+      allow create: if incoming().updatedAt == request.time
+        && (
+          (settingId == 'branches' && isValidBranchesConfig(incoming()))
+          || (settingId == 'categories' && isValidCategoriesConfig(incoming()))
+          || (settingId == 'branding' && isValidBrandingConfig(incoming()))
+        );
+      allow update: if incoming().updatedAt == request.time
+        && (
+          (settingId == 'branches' && isValidBranchesConfig(incoming()))
+          || (settingId == 'categories' && isValidCategoriesConfig(incoming()))
+          || (settingId == 'branding' && isValidBrandingConfig(incoming()))
+        );
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if request.query.limit <= 500;
+      allow create: if isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().id == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().lastLoginAt == request.time;
+      allow update: if isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['nombreCompleto', 'usuario', 'pinHash', 'rol', 'sucursalAsignada', 'permisos', 'modoOscuro', 'activo', 'operatingScope', 'lastLoginAt', 'updatedAt']);
+      allow delete: if isValidId(userId);
+    }
+
+    match /counters/{counterId} {
+      allow get: if isValidCounterId(counterId);
+      allow create: if isValidCounter(incoming(), counterId)
+        && incoming().lastSequence == 1
+        && incoming().updatedAt == request.time;
+      allow update: if isValidCounter(incoming(), counterId)
+        && incoming().lastSequence == existing().lastSequence + 1
+        && incoming().updatedAt == request.time;
+    }
+
+    match /products/{productId} {
+      allow get: if isValidId(productId);
+      allow list: if request.query.limit <= 5000;
+      allow create: if isValidId(productId)
+        && isValidProduct(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(productId)
+        && isValidProduct(incoming())
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['sku', 'barcodeSKU', 'codigoModelo', 'codigoActual', 'name', 'category', 'size', 'color', 'marca', 'especificaciones', 'estatusOriginal', 'costoReferencia', 'price', 'stock', 'updatedAt']);
+      allow delete: if isValidId(productId);
+    }
+
+    match /sales/{saleId} {
+      allow get: if isValidId(saleId);
+      allow list: if request.query.limit <= 500;
+      allow create: if isValidId(saleId)
+        && isValidSale(incoming())
+        && (!('status' in incoming().keys()) || incoming().status == 'completada')
+        && incoming().createdAt == request.time;
+      allow update: if isValidId(saleId)
+        && isValidSale(incoming())
+        && (!('status' in existing().keys()) || existing().status != 'cancelada')
+        && incoming().status == 'cancelada'
+        && incoming().folio == existing().folio
+        && incoming().branchId == existing().branchId
+        && incoming().sellerUid == existing().sellerUid
+        && incoming().total == existing().total
+        && incoming().createdAt == existing().createdAt
+        && incoming().cancelledAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'cancelledAt', 'cancelledByUid', 'cancelledByName', 'cancellationReason', 'updatedAt']);
+    }
+
+    match /customers/{customerId} {
+      allow get: if isValidId(customerId);
+      allow list: if request.query.limit <= 500;
+      allow create: if isValidId(customerId)
+        && isValidCustomer(incoming())
+        && incoming().id == customerId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(customerId)
+        && isValidCustomer(incoming())
+        && incoming().id == existing().id
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdByName == existing().createdByName
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['nombreCompleto', 'telefono', 'email', 'fechaEvento', 'notas', 'datosFiscales', 'updatedAt']);
+    }
+
+    match /layaways/{layawayId} {
+      allow get: if isValidId(layawayId);
+      allow list: if request.query.limit <= 500;
+      allow create: if isValidId(layawayId)
+        && isValidLayaway(incoming())
+        && incoming().id == layawayId
+        && incoming().status in ['activo', 'liquidado']
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/customers/$(incoming().customerId));
+      allow update: if isValidId(layawayId)
+        && isValidLayaway(incoming())
+        && !(existing().status in ['entregado', 'cancelado'])
+        && incoming().id == existing().id
+        && incoming().folio == existing().folio
+        && incoming().branchId == existing().branchId
+        && incoming().customerId == existing().customerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (existing().status == 'activo'
+            && incoming().status in ['activo', 'liquidado']
+            && incoming().diff(existing()).affectedKeys().hasOnly(['totalPaid', 'remainingBalance', 'status', 'settledAt', 'updatedAt']))
+          || (existing().status == 'liquidado'
+            && incoming().status == 'entregado'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'deliveredAt', 'deliveredByUid', 'deliveredByName', 'updatedAt']))
+          || (existing().status in ['activo', 'liquidado']
+            && incoming().status == 'cancelado'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'cancelledAt', 'cancelledByUid', 'cancelledByName', 'cancellationReason', 'updatedAt']))
+        );
+    }
+
+    match /layaway_payments/{paymentId} {
+      allow get: if isValidId(paymentId);
+      allow list: if request.query.limit <= 500;
+      allow create: if isValidId(paymentId)
+        && isValidLayawayPayment(incoming())
+        && incoming().id == paymentId
+        && incoming().createdAt == request.time
+        && existsAfter(/databases/$(database)/documents/layaways/$(incoming().layawayId));
+    }
+
+    match /cash_registers/{registerId} {
+      allow get: if isValidId(registerId);
+      allow list: if request.query.limit <= 500;
+      allow create: if isValidId(registerId)
+        && isValidCashRegister(incoming())
+        && incoming().id == registerId
+        && incoming().status == 'open'
+        && incoming().openedAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(registerId)
+        && isValidCashRegister(incoming())
+        && existing().status == 'open'
+        && incoming().status == 'closed'
+        && incoming().id == existing().id
+        && incoming().folio == existing().folio
+        && incoming().branchId == existing().branchId
+        && incoming().openedByUid == existing().openedByUid
+        && incoming().openedAt == existing().openedAt
+        && incoming().closedAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'closedByUid', 'closedByName', 'closedByUsuario', 'closedAt', 'updatedAt', 'directSalesCount', 'directSalesCash', 'directSalesCard', 'directSalesTransfer', 'directSalesTotal', 'layawayPaymentsCount', 'layawayCash', 'layawayCard', 'layawayTransfer', 'layawayTotal', 'expectedCashTotal', 'totalCard', 'totalTransfer', 'grandTotalIncome', 'countedCash', 'difference', 'observations']);
+    }
+
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId);
+      allow list: if request.query.limit <= 500;
+      allow create: if isValidId(logId)
+        && isValidAuditLog(incoming())
+        && incoming().createdAt == request.time;
+    }
+  }
+}
