@@ -68,6 +68,7 @@ export function SettingsLogsView() {
   // Branding editing state (Admin only)
   const [companyNameInput, setCompanyNameInput] = useState(branding.companyName);
   const [companyLogoInput, setCompanyLogoInput] = useState(branding.companyLogoUrl);
+  const [isBrandingDirty, setIsBrandingDirty] = useState(false);
   const [savingBranding, setSavingBranding] = useState(false);
   const [brandingToast, setBrandingToast] = useState<{
     type: 'success' | 'error';
@@ -85,9 +86,10 @@ export function SettingsLogsView() {
   const [filterDateTo, setFilterDateTo] = useState('');
 
   useEffect(() => {
+    if (isBrandingDirty) return;
     setCompanyNameInput(branding.companyName);
     setCompanyLogoInput(branding.companyLogoUrl);
-  }, [branding.companyName, branding.companyLogoUrl]);
+  }, [branding.companyName, branding.companyLogoUrl, isBrandingDirty]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -197,6 +199,7 @@ export function SettingsLogsView() {
           return;
         }
         setCompanyLogoInput(dataUrl);
+        setIsBrandingDirty(true);
       };
       img.onerror = () => {
         setBrandingToast({ type: 'error', text: 'No se pudo procesar la imagen seleccionada.' });
@@ -242,6 +245,9 @@ export function SettingsLogsView() {
         }
       );
 
+      setCompanyNameInput(cleanName);
+      setCompanyLogoInput(cleanLogo);
+      setIsBrandingDirty(false);
       setBrandingToast({
         type: 'success',
         text: 'Nombre y logotipo de la empresa guardados en tiempo real.',
@@ -679,7 +685,10 @@ export function SettingsLogsView() {
                   required
                   maxLength={FIELD_LIMITS.COMPANY_NAME_MAX}
                   value={companyNameInput}
-                  onChange={(e) => setCompanyNameInput(e.target.value)}
+                  onChange={(e) => {
+                    setCompanyNameInput(e.target.value);
+                    setIsBrandingDirty(true);
+                  }}
                   placeholder="Ej. Casa Gala XV"
                   className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3.5 py-2 text-sm text-stone-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-600/40"
                 />
@@ -723,7 +732,10 @@ export function SettingsLogsView() {
                     <input
                       type="text"
                       value={companyLogoInput.startsWith('data:image/') ? '' : companyLogoInput}
-                      onChange={(e) => setCompanyLogoInput(e.target.value)}
+                      onChange={(e) => {
+                        setCompanyLogoInput(e.target.value);
+                        setIsBrandingDirty(true);
+                      }}
                       placeholder={
                         companyLogoInput.startsWith('data:image/')
                           ? 'Imagen cargada desde archivo'
@@ -735,7 +747,10 @@ export function SettingsLogsView() {
                     {companyLogoInput && (
                       <button
                         type="button"
-                        onClick={() => setCompanyLogoInput('')}
+                        onClick={() => {
+                          setCompanyLogoInput('');
+                          setIsBrandingDirty(true);
+                        }}
                         className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-stone-300 dark:border-zinc-700 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 whitespace-nowrap shrink-0 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -747,7 +762,26 @@ export function SettingsLogsView() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {isBrandingDirty && (
+                <>
+                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400 mr-auto">
+                    Tienes cambios sin guardar en la identidad.
+                  </span>
+                  <button
+                    type="button"
+                    disabled={savingBranding}
+                    onClick={() => {
+                      setCompanyNameInput(branding.companyName);
+                      setCompanyLogoInput(branding.companyLogoUrl);
+                      setIsBrandingDirty(false);
+                    }}
+                    className="px-4 py-2.5 rounded-lg border border-stone-300 dark:border-zinc-700 text-sm font-medium text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    Descartar cambios
+                  </button>
+                </>
+              )}
               <button
                 type="submit"
                 disabled={savingBranding}

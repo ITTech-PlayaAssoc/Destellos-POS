@@ -44,7 +44,7 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
 
   // Category state
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [editingCategoryIndex, setEditingCategoryIndex] = useState<number | null>(null);
+  const [editingCategoryOriginal, setEditingCategoryOriginal] = useState<string | null>(null);
   const [editingCategoryValue, setEditingCategoryValue] = useState('');
   const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
   const [savingCategories, setSavingCategories] = useState(false);
@@ -55,6 +55,7 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
 
   // Branch state
   const [branchDrafts, setBranchDrafts] = useState<BranchInfo[]>(branchList);
+  const [isBranchesDirty, setIsBranchesDirty] = useState(false);
   const [showAddBranchForm, setShowAddBranchForm] = useState(false);
   const [newBranch, setNewBranch] = useState({
     name: '',
@@ -70,8 +71,11 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
   } | null>(null);
 
   useEffect(() => {
-    setBranchDrafts(branchList);
-  }, [branchList]);
+    if (isBranchesDirty) return;
+    setBranchDrafts((prev) =>
+      JSON.stringify(prev) === JSON.stringify(branchList) ? prev : branchList
+    );
+  }, [branchList, isBranchesDirty]);
 
   const productCountByCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -176,28 +180,27 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
     }
   };
 
-  const handleSaveRenameCategory = async (index: number) => {
-    const oldName = categories[index];
+  const handleSaveRenameCategory = async (oldName: string) => {
     const cleanNew = truncateStr(editingCategoryValue, FIELD_LIMITS.CATEGORY_MAX);
     if (!oldName || !cleanNew) {
       showCategoryToast('error', 'El nombre de la categoría no puede estar vacío.');
       return;
     }
     if (cleanNew === oldName) {
-      setEditingCategoryIndex(null);
+      setEditingCategoryOriginal(null);
       setEditingCategoryValue('');
       return;
     }
     if (
       categories.some(
-        (c, idx) => idx !== index && c.toLowerCase() === cleanNew.toLowerCase()
+        (c) => c !== oldName && c.toLowerCase() === cleanNew.toLowerCase()
       )
     ) {
       showCategoryToast('error', `Ya existe otra categoría llamada "${cleanNew}".`);
       return;
     }
 
-    const next = categories.map((c, idx) => (idx === index ? cleanNew : c));
+    const next = categories.map((c) => (c === oldName ? cleanNew : c));
     const affectedCount = productCountByCategory.get(oldName) || 0;
     const ok = await persistCategories(
       next,
@@ -205,7 +208,7 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
       { from: oldName, to: cleanNew }
     );
     if (ok) {
-      setEditingCategoryIndex(null);
+      setEditingCategoryOriginal(null);
       setEditingCategoryValue('');
       showCategoryToast(
         'success',
@@ -277,6 +280,8 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
           sucursalAsignada: profile.sucursalAsignada,
         }
       );
+      setBranchDrafts(sanitizedList);
+      setIsBranchesDirty(false);
       return true;
     } catch (err) {
       showBranchToast(
@@ -439,9 +444,9 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 dark:divide-zinc-800/80">
-              {categories.map((cat, idx) => {
+              {categories.map((cat) => {
                 const count = productCountByCategory.get(cat) || 0;
-                const isEditing = editingCategoryIndex === idx;
+                const isEditing = editingCategoryOriginal === cat;
                 const isConfirmingDelete = deletingCategory === cat;
 
                 return (
@@ -461,9 +466,9 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                void handleSaveRenameCategory(idx);
+                                void handleSaveRenameCategory(cat);
                               } else if (e.key === 'Escape') {
-                                setEditingCategoryIndex(null);
+                                setEditingCategoryOriginal(null);
                                 setEditingCategoryValue('');
                               }
                             }}
@@ -487,7 +492,7 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
                           <button
                             type="button"
                             disabled={savingCategories}
-                            onClick={() => void handleSaveRenameCategory(idx)}
+                            onClick={() => void handleSaveRenameCategory(cat)}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-stone-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-medium cursor-pointer"
                           >
                             <Check className="w-3.5 h-3.5" />
@@ -496,7 +501,7 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
                           <button
                             type="button"
                             onClick={() => {
-                              setEditingCategoryIndex(null);
+                              setEditingCategoryOriginal(null);
                               setEditingCategoryValue('');
                             }}
                             className="p-1.5 rounded-md border border-stone-200 dark:border-zinc-700 text-stone-600 dark:text-zinc-300 cursor-pointer"
@@ -532,7 +537,7 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
                             type="button"
                             onClick={() => {
                               setDeletingCategory(null);
-                              setEditingCategoryIndex(idx);
+                              setEditingCategoryOriginal(cat);
                               setEditingCategoryValue(cat);
                             }}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-stone-200 dark:border-zinc-700 text-xs font-medium text-stone-700 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-800 cursor-pointer"
@@ -753,13 +758,14 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
                       required
                       maxLength={FIELD_LIMITS.BRANCH_NAME_MAX}
                       value={branch.name}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setIsBranchesDirty(true);
                         setBranchDrafts((prev) =>
                           prev.map((item) =>
                             item.id === branch.id ? { ...item, name: e.target.value } : item
                           )
-                        )
-                      }
+                        );
+                      }}
                       className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-stone-900 dark:text-zinc-100"
                     />
                   </div>
@@ -772,13 +778,14 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
                       type="text"
                       maxLength={FIELD_LIMITS.BRANCH_CITY_MAX}
                       value={branch.city}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setIsBranchesDirty(true);
                         setBranchDrafts((prev) =>
                           prev.map((item) =>
                             item.id === branch.id ? { ...item, city: e.target.value } : item
                           )
-                        )
-                      }
+                        );
+                      }}
                       placeholder="Ej. Guadalajara"
                       className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-stone-900 dark:text-zinc-100"
                     />
@@ -792,13 +799,14 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
                       type="text"
                       maxLength={FIELD_LIMITS.BRANCH_ADDRESS_MAX}
                       value={branch.address}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setIsBranchesDirty(true);
                         setBranchDrafts((prev) =>
                           prev.map((item) =>
                             item.id === branch.id ? { ...item, address: e.target.value } : item
                           )
-                        )
-                      }
+                        );
+                      }}
                       placeholder="Calle y número"
                       className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-stone-900 dark:text-zinc-100"
                     />
@@ -812,13 +820,14 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
                       type="text"
                       maxLength={FIELD_LIMITS.BRANCH_PHONE_MAX}
                       value={branch.phone}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setIsBranchesDirty(true);
                         setBranchDrafts((prev) =>
                           prev.map((item) =>
                             item.id === branch.id ? { ...item, phone: e.target.value } : item
                           )
-                        )
-                      }
+                        );
+                      }}
                       placeholder="Ej. 33 0000 0000"
                       className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono-tabular text-stone-900 dark:text-zinc-100"
                     />
@@ -828,7 +837,25 @@ export function CatalogBranchesAdminView({ products }: CatalogBranchesAdminViewP
             })}
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {isBranchesDirty && (
+              <>
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-400 mr-auto">
+                  Hay cambios sin guardar en los datos de sucursales.
+                </span>
+                <button
+                  type="button"
+                  disabled={savingBranches}
+                  onClick={() => {
+                    setBranchDrafts(branchList);
+                    setIsBranchesDirty(false);
+                  }}
+                  className="px-4 py-2.5 rounded-lg border border-stone-300 dark:border-zinc-700 text-sm font-medium text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  Descartar cambios
+                </button>
+              </>
+            )}
             <button
               type="submit"
               disabled={savingBranches}

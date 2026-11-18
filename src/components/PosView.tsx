@@ -204,6 +204,11 @@ export function PosView({
     [cart]
   );
 
+  const totalCartUnits = useMemo(
+    () => cart.reduce((acc, line) => acc + line.quantity, 0),
+    [cart]
+  );
+
   const discountVal = Math.max(0, Number(discountInput) || 0);
   const discountAmount = useMemo(() => {
     if (discountType === 'none' || subtotal <= 0) return 0;
@@ -986,20 +991,25 @@ export function PosView({
               )}
             </div>
 
-            {/* Right: Contiguous Cart & Direct Checkout Module */}
-            <div className="lg:col-span-5 xl:col-span-4 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 space-y-5 lg:sticky lg:top-6">
+            {/* Right: Independent Scrollable Cart & Direct Checkout Module */}
+            <aside className="lg:col-span-5 xl:col-span-4 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 space-y-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto cart-scrollbar">
               <div className="flex items-center justify-between border-b border-stone-200 dark:border-zinc-800 pb-3.5">
-                <div className="flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                  <h2 className="text-base font-semibold text-stone-900 dark:text-zinc-100">
+                <div className="flex items-center gap-2 min-w-0">
+                  <ShoppingBag className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
+                  <h2 className="text-base font-semibold text-stone-900 dark:text-zinc-100 truncate">
                     Carrito de Venta
                   </h2>
+                  {totalCartUnits > 0 && (
+                    <span className="text-xs font-mono-tabular text-stone-500 dark:text-zinc-400 shrink-0">
+                      ({totalCartUnits})
+                    </span>
+                  )}
                 </div>
                 {cart.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setCart([])}
-                    className="text-xs text-stone-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400 cursor-pointer"
+                    className="text-xs text-stone-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400 cursor-pointer shrink-0"
                   >
                     Vaciar
                   </button>
@@ -1007,11 +1017,11 @@ export function PosView({
               </div>
 
               {cart.length === 0 ? (
-                <div className="py-10 text-center text-sm text-stone-500 dark:text-zinc-400">
-                  Escanea un código de barras o selecciona artículos del catálogo para iniciar la venta.
+                <div className="py-8 text-center text-sm text-stone-500 dark:text-zinc-400">
+                  Escanea un código de barras o busca artículos en el panel izquierdo para iniciar la venta.
                 </div>
               ) : (
-                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                <div className="space-y-3">
                   {cart.map((line) => {
                     const avail = line.product.stock?.[activeBranch] ?? 0;
                     return (
@@ -1209,7 +1219,7 @@ export function PosView({
                 )}
               </div>
 
-              {/* Direct Payment Method (3 Options) */}
+              {/* Direct Payment Method & Checkout Action */}
               <div className="pt-3 border-t border-stone-200 dark:border-zinc-800 space-y-3">
                 <label className="block text-xs font-medium text-stone-600 dark:text-zinc-400">
                   Método de pago
@@ -1329,7 +1339,7 @@ export function PosView({
                         : 'Finalizar Venta y Emitir Ticket'}
                 </button>
               </div>
-            </div>
+            </aside>
           </div>
           )}
         </div>

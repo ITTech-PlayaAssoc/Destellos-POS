@@ -120,14 +120,24 @@ function createPollingSubscription<T>(
   pollIntervalMs = 30000
 ): Unsubscribe {
   let cancelled = false;
+  let lastSerialized: string | null = null;
 
   const runFetch = async () => {
     if (cancelled) return;
     try {
       const data = await fetcher();
-      if (!cancelled) {
-        onData(data);
+      if (cancelled) return;
+      let serialized: string | null = null;
+      try {
+        serialized = JSON.stringify(data);
+      } catch {
+        serialized = null;
       }
+      if (serialized !== null && serialized === lastSerialized) {
+        return;
+      }
+      lastSerialized = serialized;
+      onData(data);
     } catch (err) {
       if (cancelled) return;
       const error = err instanceof Error ? err : new Error(String(err));
