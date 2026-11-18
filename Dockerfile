@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Install dependencies cleanly
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN if [ -f package-lock.json ]; then npm ci --legacy-peer-deps; else npm install --legacy-peer-deps; fi
 
 # Build-time Data Provider & Client Environment Variables
 ARG VITE_DATA_SOURCE=firestore
