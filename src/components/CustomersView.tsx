@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   BookmarkCheck,
   Calendar,
   Edit3,
@@ -8,10 +9,11 @@ import {
   Phone,
   Receipt,
   Search,
+  Trash2,
   UserPlus,
   Users,
 } from 'lucide-react';
-import { layawayService, salesService } from '../services/dataProvider';
+import { customerService, layawayService, salesService } from '../services/dataProvider';
 import { formatCurrency, formatDateTime, formatEventDate, toMillis } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -29,14 +31,17 @@ interface CustomersViewProps {
 }
 
 export function CustomersView({ customers, loading, onGoToLayaways }: CustomersViewProps) {
-  const { profile, hasPermission } = useAuth();
+  const { profile, operatingScope, hasPermission, getBranchName } = useAuth();
 
   const [search, setSearch] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [modalMode, setModalMode] = useState<
     { type: 'create' } | { type: 'edit'; customer: Customer } | null
   >(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [customerSales, setCustomerSales] = useState<Sale[]>([]);
   const [customerLayaways, setCustomerLayaways] = useState<Layaway[]>([]);
@@ -115,6 +120,7 @@ export function CustomersView({ customers, loading, onGoToLayaways }: CustomersV
   if (!profile) return null;
 
   const canAccessLayaways = profile.rol === 'admin' || hasPermission('manageLayaways');
+  const canManageCustomers = profile.rol === 'admin' || hasPermission('manageCustomers');
 
   const totalPendingBalance = customerLayaways
     .filter((l) => l.status === 'activo')
@@ -124,11 +130,44 @@ export function CustomersView({ customers, loading, onGoToLayaways }: CustomersV
     (l) => l.status === 'activo' || l.status === 'liquidado'
   ).length;
 
-  const showToast = (text: string) => {
-    setToast(text);
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+    setToast({ type, text });
     setTimeout(() => {
-      setToast((prev) => (prev === text ? null : prev));
+      setToast((prev) => (prev?.text === text ? null : prev));
     }, 4500);
+  };
+
+  const handleConfirmDeleteCustomer = async () => {
+    if (!deleteTarget || !canManageCustomers) return;
+    setDeletingCustomer(true);
+    setDeleteError(null);
+    const branchId =
+      operatingScope !== 'general' ? operatingScope : profile.sucursalAsignada;
+    try {
+      await customerService.deleteCustomer(
+        deleteTarget,
+        branchId,
+        getBranchName(branchId),
+        {
+          id: profile.id,
+          nombreCompleto: profile.nombreCompleto,
+          usuario: profile.usuario,
+          sucursalAsignada: profile.sucursalAsignada,
+        }
+      );
+      const removedName = deleteTarget.nombreCompleto;
+      if (selectedCustomerId === deleteTarget.id) {
+        setSelectedCustomerId(null);
+      }
+      setDeleteTarget(null);
+      showToast(`Cliente "${removedName}" eliminado del directorio CRM.`, 'success');
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : 'No se pudo quitar al cliente del CRM.'
+      );
+    } finally {
+      setDeletingCustomer(false);
+    }
   };
 
   return (
@@ -154,8 +193,14 @@ export function CustomersView({ customers, loading, onGoToLayaways }: CustomersV
       </div>
 
       {toast && (
-        <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
-          {toast}
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            toast.type === 'error'
+              ? 'border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300'
+              : 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300'
+          }`}
+        >
+          {toast.text}
         </div>
       )}
 
@@ -289,14 +334,36 @@ export function CustomersView({ customers, loading, onGoToLayaways }: CustomersV
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setModalMode({ type: 'edit', customer: selectedCustomer })}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-stone-300 dark:border-zinc-700 text-xs font-medium text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 whitespace-nowrap shrink-0 cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Editar expediente</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setModalMode({ type: 'edit', customer: selectedCustomer })}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-stone-300 dark:border-zinc-700 text-xs font-medium text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Editar expediente</span>
+                    </button>
+
+                    {canManageCustomers && (
+                      <button
+                        type="button"
+                        disabled={loadingProfileHistory || customerLayaways.length > 0}
+                        title={
+                          customerLayaways.length > 0
+                            ? 'No se puede quitar un cliente con apartados registrados'
+                            : 'Quitar cliente del CRM'
+                        }
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget(selectedCustomer);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 dark:border-red-900/60 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-45 disabled:cursor-not-allowed whitespace-nowrap shrink-0 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Quitar cliente</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Metrics Strip */}
@@ -518,6 +585,67 @@ export function CustomersView({ customers, loading, onGoToLayaways }: CustomersV
             );
           }}
         />
+      )}
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-semibold text-stone-900 dark:text-zinc-100">
+                  Quitar cliente del CRM
+                </h3>
+                <p className="mt-1.5 text-sm text-stone-600 dark:text-zinc-400 leading-relaxed">
+                  ¿Estás seguro de eliminar a{' '}
+                  <span className="font-semibold text-stone-900 dark:text-zinc-100">
+                    {deleteTarget.nombreCompleto}
+                  </span>{' '}
+                  ({deleteTarget.telefono})? Esta acción eliminará su expediente de forma permanente.
+                </p>
+                {customerSales.length > 0 && (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                    Los {customerSales.length} ticket(s) de venta directa previos conservarán su historial de folios y nombre sin verse afectados.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={deletingCustomer}
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteError(null);
+                }}
+                className="px-4 py-2 rounded-lg border border-stone-300 dark:border-zinc-700 text-sm font-medium text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={deletingCustomer}
+                onClick={() => void handleConfirmDeleteCustomer()}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 cursor-pointer"
+              >
+                {deletingCustomer ? 'Eliminando...' : 'Quitar cliente'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -42,6 +42,11 @@ import {
 } from '../types/boutique';
 import { ThermalTicketModal } from './ThermalTicketModal';
 import { BarcodeModal } from './BarcodeModal';
+import {
+  DatePickerInput,
+  getLocalIsoDate,
+  getMonthStartIsoDate,
+} from './DatePickerInput';
 
 export function SettingsLogsView() {
   const {
@@ -827,6 +832,47 @@ export function SettingsLogsView() {
               )}
             </div>
 
+            {/* Quick Date Presets */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-medium text-stone-500 dark:text-zinc-400 mr-1">
+                Rango rápido:
+              </span>
+              {(() => {
+                const today = getLocalIsoDate(0);
+                const yesterday = getLocalIsoDate(-1);
+                const last7 = getLocalIsoDate(-6);
+                const monthStart = getMonthStartIsoDate();
+                const presets = [
+                  { label: 'Todas', from: '', to: '' },
+                  { label: 'Hoy', from: today, to: today },
+                  { label: 'Ayer', from: yesterday, to: yesterday },
+                  { label: 'Últimos 7 días', from: last7, to: today },
+                  { label: 'Este mes', from: monthStart, to: today },
+                ];
+                return presets.map((preset) => {
+                  const isActive =
+                    filterDateFrom === preset.from && filterDateTo === preset.to;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        setFilterDateFrom(preset.from);
+                        setFilterDateTo(preset.to);
+                      }}
+                      className={`px-2.5 py-1 rounded-md border text-[11px] font-medium transition-colors cursor-pointer ${
+                        isActive
+                          ? 'border-stone-900 bg-stone-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+                          : 'border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-950 text-stone-700 dark:text-zinc-300 hover:bg-stone-100 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
             {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div>
@@ -884,26 +930,48 @@ export function SettingsLogsView() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-stone-500 dark:text-zinc-400 mb-1">
+                <label
+                  htmlFor="logs-date-from"
+                  className="block text-[11px] font-medium text-stone-500 dark:text-zinc-400 mb-1"
+                >
                   Fecha desde
                 </label>
-                <input
-                  type="date"
+                <DatePickerInput
+                  id="logs-date-from"
+                  ariaLabel="Fecha desde"
+                  placeholder="Desde..."
                   value={filterDateFrom}
-                  onChange={(e) => setFilterDateFrom(e.target.value)}
-                  className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-xs font-mono-tabular text-stone-900 dark:text-zinc-100"
+                  onChange={(val) => {
+                    setFilterDateFrom(val);
+                    if (val && filterDateTo && val > filterDateTo) {
+                      setFilterDateTo(val);
+                    }
+                  }}
+                  size="sm"
+                  align="left"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-stone-500 dark:text-zinc-400 mb-1">
+                <label
+                  htmlFor="logs-date-to"
+                  className="block text-[11px] font-medium text-stone-500 dark:text-zinc-400 mb-1"
+                >
                   Fecha hasta
                 </label>
-                <input
-                  type="date"
+                <DatePickerInput
+                  id="logs-date-to"
+                  ariaLabel="Fecha hasta"
+                  placeholder="Hasta..."
                   value={filterDateTo}
-                  onChange={(e) => setFilterDateTo(e.target.value)}
-                  className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-xs font-mono-tabular text-stone-900 dark:text-zinc-100"
+                  onChange={(val) => {
+                    setFilterDateTo(val);
+                    if (val && filterDateFrom && val < filterDateFrom) {
+                      setFilterDateFrom(val);
+                    }
+                  }}
+                  size="sm"
+                  align="right"
                 />
               </div>
             </div>

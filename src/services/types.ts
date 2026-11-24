@@ -384,6 +384,12 @@ export interface ICustomerService {
     branchName: string,
     actor: ServiceActor
   ): Promise<Customer>;
+  deleteCustomer(
+    customer: Customer,
+    branchId: BranchId,
+    branchName: string,
+    actor: ServiceActor
+  ): Promise<void>;
 }
 
 export interface ILogService {

@@ -247,6 +247,7 @@
             "CONFIGURACION_EMPRESA",
             "CREACION_CLIENTE",
             "EDICION_CLIENTE",
+            "ELIMINACION_CLIENTE",
             "APARTADO_CREADO",
             "ABONO_APARTADO",
             "APARTADO_LIQUIDADO",

@@ -1828,7 +1828,46 @@ app.delete(
   '/api/customers/:id',
   requireAuth,
   asyncHandler(async (req, res) => {
-    await pool.query('DELETE FROM customers WHERE id = ?', [req.params.id]);
+    const customerId = req.params.id;
+    const {
+      branchId = 'branch_1',
+      branchName = 'Sucursal 1',
+    } = req.body || {};
+    const actor = resolveActor(req, req.body?.actor);
+
+    await withTransaction(async (conn) => {
+      const [existing] = await conn.query(
+        'SELECT id, nombre_completo, telefono FROM customers WHERE id = ? FOR UPDATE',
+        [customerId]
+      );
+      if (existing.length === 0) {
+        throw new HttpError(404, 'Cliente no encontrado.');
+      }
+
+      const [layawayRows] = await conn.query(
+        'SELECT COUNT(*) AS total FROM layaways WHERE customer_id = ? FOR UPDATE',
+        [customerId]
+      );
+      if (Number(layawayRows[0]?.total || 0) > 0) {
+        throw new HttpError(
+          409,
+          'No se puede quitar este cliente porque tiene apartados registrados en su historial.'
+        );
+      }
+
+      await conn.query('DELETE FROM customers WHERE id = ?', [customerId]);
+
+      await insertAuditLog(conn, {
+        userUid: actor.id,
+        userName: actor.nombreCompleto,
+        userUsuario: actor.usuario,
+        branchId,
+        branchName,
+        actionType: 'ELIMINACION_CLIENTE',
+        description: `Baja de cliente "${existing[0].nombre_completo}" (WhatsApp/Tel: ${existing[0].telefono}).`,
+      });
+    });
+
     res.status(204).end();
   })
 );

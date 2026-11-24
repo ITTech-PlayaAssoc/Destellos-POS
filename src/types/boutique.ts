@@ -43,6 +43,7 @@ export type ActionType =
   | 'CONFIGURACION_EMPRESA'
   | 'CREACION_CLIENTE'
   | 'EDICION_CLIENTE'
+  | 'ELIMINACION_CLIENTE'
   | 'APARTADO_CREADO'
   | 'ABONO_APARTADO'
   | 'APARTADO_LIQUIDADO'
@@ -69,6 +70,7 @@ export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   CONFIGURACION_EMPRESA: 'Identidad de empresa',
   CREACION_CLIENTE: 'Alta de cliente',
   EDICION_CLIENTE: 'Edición de cliente',
+  ELIMINACION_CLIENTE: 'Baja de cliente',
   APARTADO_CREADO: 'Nuevo apartado',
   ABONO_APARTADO: 'Abono de apartado',
   APARTADO_LIQUIDADO: 'Apartado liquidado',

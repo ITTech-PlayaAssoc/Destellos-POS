@@ -338,7 +338,7 @@ service cloud.firestore {
         && data.userUsuario is string && data.userUsuario.size() >= 1 && data.userUsuario.size() <= 64
         && isValidId(data.branchId)
         && data.branchName is string && data.branchName.size() >= 1 && data.branchName.size() <= 80
-        && data.actionType in ['INICIO_SESION', 'CIERRE_SESION', 'CREACION_USUARIO', 'EDICION_USUARIO', 'CAMBIO_PERMISOS', 'ALTA_PRODUCTO', 'IMPORTACION_EXCEL', 'ENTRADA_STOCK', 'DESCARTE_STOCK', 'VACIADO_INVENTARIO', 'VENTA_REALIZADA', 'VENTA_CANCELADA', 'CONFIGURACION_SUCURSALES', 'CONFIGURACION_CATEGORIAS', 'CONFIGURACION_EMPRESA', 'CREACION_CLIENTE', 'EDICION_CLIENTE', 'APARTADO_CREADO', 'ABONO_APARTADO', 'APARTADO_LIQUIDADO', 'APARTADO_ENTREGADO', 'APARTADO_CANCELADO', 'APERTURA_CAJA', 'CIERRE_CAJA']
+        && data.actionType in ['INICIO_SESION', 'CIERRE_SESION', 'CREACION_USUARIO', 'EDICION_USUARIO', 'CAMBIO_PERMISOS', 'ALTA_PRODUCTO', 'IMPORTACION_EXCEL', 'ENTRADA_STOCK', 'DESCARTE_STOCK', 'VACIADO_INVENTARIO', 'VENTA_REALIZADA', 'VENTA_CANCELADA', 'CONFIGURACION_SUCURSALES', 'CONFIGURACION_CATEGORIAS', 'CONFIGURACION_EMPRESA', 'CREACION_CLIENTE', 'EDICION_CLIENTE', 'ELIMINACION_CLIENTE', 'APARTADO_CREADO', 'ABONO_APARTADO', 'APARTADO_LIQUIDADO', 'APARTADO_ENTREGADO', 'APARTADO_CANCELADO', 'APERTURA_CAJA', 'CIERRE_CAJA']
         && data.description is string && data.description.size() >= 1 && data.description.size() <= 600
         && data.createdAt is timestamp;
     }
@@ -441,6 +441,7 @@ service cloud.firestore {
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly(['nombreCompleto', 'telefono', 'email', 'fechaEvento', 'notas', 'datosFiscales', 'updatedAt']);
+      allow delete: if isValidId(customerId);
     }
 
     match /layaways/{layawayId} {

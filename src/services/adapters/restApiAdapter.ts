@@ -680,6 +680,15 @@ const customerService: ICustomerService = {
     emitTopic('audit_logs');
     return updated;
   },
+
+  async deleteCustomer(customer, branchId, branchName, actor) {
+    await apiRequest<void>(`/customers/${encodeURIComponent(customer.id)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ branchId, branchName, actor }),
+    });
+    emitTopic('customers');
+    emitTopic('audit_logs');
+  },
 };
 
 export const restApiDataProvider: IDataProvider = {

@@ -11,6 +11,7 @@ import {
   type Customer,
   type CustomerFiscalData,
 } from '../types/boutique';
+import { DatePickerInput } from './DatePickerInput';
 
 interface CustomerQuickModalProps {
   editingCustomer?: Customer | null;
@@ -193,14 +194,21 @@ export function CustomerQuickModal({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-stone-700 dark:text-zinc-300 mb-1.5">
+              <label
+                htmlFor="customer-event-date"
+                className="block text-xs font-medium text-stone-700 dark:text-zinc-300 mb-1.5"
+              >
                 Fecha del evento (opcional, XV años)
               </label>
-              <input
-                type="date"
+              <DatePickerInput
+                id="customer-event-date"
+                ariaLabel="Fecha del evento (opcional, XV años)"
                 value={fechaEvento}
-                onChange={(e) => setFechaEvento(e.target.value)}
-                className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm font-mono-tabular text-stone-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-600/40"
+                onChange={setFechaEvento}
+                placeholder="Seleccionar fecha del evento"
+                minYear={new Date().getFullYear() - 1}
+                maxYear={new Date().getFullYear() + 5}
+                size="md"
               />
             </div>
           </div>

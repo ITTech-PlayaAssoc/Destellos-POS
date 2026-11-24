@@ -4,7 +4,6 @@ import {
   Ban,
   Banknote,
   Barcode,
-  Calendar,
   CreditCard,
   Minus,
   Plus,
@@ -40,6 +39,7 @@ import {
 } from '../types/boutique';
 import { CashRegisterTab } from './CashRegisterTab';
 import { CustomerQuickModal } from './CustomerQuickModal';
+import { DatePickerInput, getLocalIsoDate } from './DatePickerInput';
 import { ThermalTicketModal } from './ThermalTicketModal';
 
 interface PosViewProps {
@@ -606,17 +606,46 @@ export function PosView({
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex items-center">
-                  <Calendar className="w-4 h-4 text-stone-400 dark:text-zinc-500 absolute left-3 pointer-events-none" />
-                  <input
-                    type="date"
-                    value={historyDateFilter}
-                    onChange={(e) => setHistoryDateFilter(e.target.value)}
-                    aria-label="Filtrar ventas por fecha"
-                    className="rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 pl-9 pr-3 py-2 text-xs font-mono-tabular text-stone-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-600/40"
-                  />
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <DatePickerInput
+                  size="sm"
+                  align="right"
+                  ariaLabel="Filtrar ventas por fecha"
+                  placeholder="Filtrar por fecha"
+                  value={historyDateFilter}
+                  onChange={setHistoryDateFilter}
+                  className="w-44"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = getLocalIsoDate(0);
+                    setHistoryDateFilter((prev) => (prev === today ? '' : today));
+                  }}
+                  className={`px-2.5 py-2 rounded-lg border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                    historyDateFilter === getLocalIsoDate(0)
+                      ? 'border-stone-900 bg-stone-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+                      : 'border-stone-300 dark:border-zinc-700 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  Hoy
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const yesterday = getLocalIsoDate(-1);
+                    setHistoryDateFilter((prev) => (prev === yesterday ? '' : yesterday));
+                  }}
+                  className={`px-2.5 py-2 rounded-lg border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                    historyDateFilter === getLocalIsoDate(-1)
+                      ? 'border-stone-900 bg-stone-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+                      : 'border-stone-300 dark:border-zinc-700 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  Ayer
+                </button>
 
                 {(historyFolioSearch || historyDateFilter) && (
                   <button

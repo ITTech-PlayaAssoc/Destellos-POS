@@ -1892,6 +1892,45 @@ const customerService: ICustomerService = {
       handleFirestoreError(err, OperationType.UPDATE, `customers/${existingCustomer.id}`);
     }
   },
+
+  async deleteCustomer(customer, branchId, branchName, actor) {
+    try {
+      const layawaysSnap = await getDocs(
+        query(
+          collection(db, 'layaways'),
+          where('customerId', '==', customer.id),
+          limit(1)
+        )
+      );
+      if (!layawaysSnap.empty) {
+        throw new Error(
+          'No se puede quitar este cliente porque tiene apartados registrados en su historial.'
+        );
+      }
+
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'customers', customer.id));
+      batch.set(
+        doc(db, 'audit_logs', generateId('log')),
+        buildFirestoreAuditDoc({
+          userUid: actor.id,
+          userName: actor.nombreCompleto,
+          userUsuario: actor.usuario,
+          branchId,
+          branchName,
+          actionType: 'ELIMINACION_CLIENTE',
+          description: `Baja de cliente "${customer.nombreCompleto}" (WhatsApp/Tel: ${customer.telefono}).`,
+        })
+      );
+      await batch.commit();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('apartados registrados')) {
+        throw err;
+      }
+      handleFirestoreError(err, OperationType.DELETE, `customers/${customer.id}`);
+    }
+  },
 };
 
 export const firestoreDataProvider: IDataProvider = {

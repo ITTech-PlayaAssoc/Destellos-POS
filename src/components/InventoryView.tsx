@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle,
   Barcode,
   CheckCircle2,
   Edit3,
@@ -83,10 +82,6 @@ export function InventoryView({ products, loading }: InventoryViewProps) {
     product: Product;
   } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
-  const [showClearAllModal, setShowClearAllModal] = useState(false);
-  const [clearAllConfirmText, setClearAllConfirmText] = useState('');
-  const [clearingAll, setClearingAll] = useState(false);
-  const [clearAllProgress, setClearAllProgress] = useState(0);
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -140,7 +135,6 @@ export function InventoryView({ products, loading }: InventoryViewProps) {
       !showExcelImportModal &&
       !stockModal &&
       !deleteTarget &&
-      !showClearAllModal &&
       !barcodeState,
     onScan: (rawCode) => {
       const code = rawCode.trim();
@@ -190,42 +184,6 @@ export function InventoryView({ products, loading }: InventoryViewProps) {
     }
   };
 
-  const handleClearAllInventory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isAdmin || clearAllConfirmText.trim().toUpperCase() !== 'BORRAR') return;
-
-    setClearingAll(true);
-    setClearAllProgress(0);
-
-    try {
-      const totalDeleted = await inventoryService.clearAllProducts(
-        {
-          id: profile.id,
-          nombreCompleto: profile.nombreCompleto,
-          usuario: profile.usuario,
-          sucursalAsignada: profile.sucursalAsignada,
-        },
-        (deleted) => setClearAllProgress(deleted)
-      );
-
-      setShowClearAllModal(false);
-      setClearAllConfirmText('');
-      showToast(
-        'success',
-        totalDeleted > 0
-          ? `Inventario vaciado: se eliminaron ${totalDeleted} producto(s) de todas las sucursales.`
-          : 'El inventario ya se encontraba vacío.'
-      );
-    } catch (error) {
-      showToast(
-        'error',
-        error instanceof Error ? error.message : 'No se pudo vaciar el inventario.'
-      );
-    } finally {
-      setClearingAll(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className={barcodeState ? 'space-y-6 no-print' : 'space-y-6'}>
@@ -264,21 +222,6 @@ export function InventoryView({ products, loading }: InventoryViewProps) {
                 ))}
               </select>
             </div>
-          )}
-
-          {isAdmin && products.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setClearAllConfirmText('');
-                setClearAllProgress(0);
-                setShowClearAllModal(true);
-              }}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-red-300 dark:border-red-900/70 bg-white dark:bg-zinc-900 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-sm font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Borrar todo el inventario (Temporal)</span>
-            </button>
           )}
 
           {canAddProduct && (
@@ -667,90 +610,6 @@ export function InventoryView({ products, loading }: InventoryViewProps) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {showClearAllModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4 no-print"
-          role="dialog"
-          aria-modal="true"
-        >
-          <form
-            onSubmit={handleClearAllInventory}
-            className="w-full max-w-md rounded-xl border border-red-200 dark:border-red-900/60 bg-white dark:bg-zinc-900 p-6 shadow-xl space-y-4"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold text-stone-900 dark:text-zinc-100">
-                  Borrar todo el inventario (Temporal)
-                </h3>
-                <p className="mt-1 text-xs text-stone-600 dark:text-zinc-400 leading-relaxed">
-                  Esta acción eliminará permanentemente los{' '}
-                  <span className="font-mono-tabular font-semibold text-stone-900 dark:text-zinc-100">
-                    {products.length}
-                  </span>{' '}
-                  productos registrados en el sistema y su stock en todas las sucursales. No se puede deshacer.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-700 dark:text-zinc-300 mb-1.5">
-                Escribe <span className="font-mono-tabular font-bold text-red-600 dark:text-red-400">BORRAR</span> para confirmar
-              </label>
-              <input
-                type="text"
-                autoFocus
-                disabled={clearingAll}
-                value={clearAllConfirmText}
-                onChange={(e) => setClearAllConfirmText(e.target.value)}
-                placeholder="BORRAR"
-                className="w-full rounded-lg border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm font-mono-tabular text-stone-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-red-600/40"
-              />
-            </div>
-
-            {clearingAll && (
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs text-stone-600 dark:text-zinc-400 font-mono-tabular">
-                  <span>Eliminando productos por lotes...</span>
-                  <span>{clearAllProgress} borrados</span>
-                </div>
-                <div className="h-2 rounded-full bg-stone-100 dark:bg-zinc-800 overflow-hidden">
-                  <div
-                    className="h-full bg-red-600 transition-all duration-200"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        products.length > 0 ? Math.round((clearAllProgress / products.length) * 100) : 100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                disabled={clearingAll}
-                onClick={() => setShowClearAllModal(false)}
-                className="px-4 py-2 rounded-lg border border-stone-300 dark:border-zinc-700 text-sm font-medium text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={clearingAll || clearAllConfirmText.trim().toUpperCase() !== 'BORRAR'}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {clearingAll ? 'Eliminando...' : 'Eliminar todo el inventario'}
-              </button>
-            </div>
-          </form>
         </div>
       )}
     </div>
